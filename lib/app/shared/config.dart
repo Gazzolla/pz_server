@@ -1,14 +1,21 @@
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:process_run/shell.dart';
 
 String zomboidFiles = Platform.isWindows ? "%UserProfile%\\zomboid" : "~/Zomboid";
 
+String serverName = "zomboid-server";
+int ramDedicated = 6;
+const bool serverHasInstalled = false;
+String? dataBasePassword;
 
+/// Visível com inputs para o usuário
+Map serverSettings = {};
 
-String applicationName = "zomboid-server";
+const String applicationName = "zomboid-server";
 
 /// %temp%
 String instalationpath = Directory.systemTemp.path;
@@ -52,4 +59,20 @@ Future createInstalationPath() async {
   }
 
   shell.kill();
+}
+
+setServerConfigs(BuildContext context) async {
+  File configs = File("$applicationPath\\files\\server-data\\StartServer64.bat");
+  String value = await configs.readAsString();
+
+  value = value.replaceAll("-Xms16g", "-Xms${ramDedicated}g").replaceAll("Xmx16g", "Xmx${ramDedicated}g");
+  value = value.replaceAll("-statistic", '-servername "$serverName" -statistic');
+
+  await configs.writeAsString(value);
+}
+
+importServerConfig() async {
+  File defaultConfigFile = File("$zomboidFiles/Server/$serverName.ini");
+
+  print(defaultConfigFile.readAsStringSync());
 }

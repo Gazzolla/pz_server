@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:project_zomboid_server/app/shared/config.dart';
+import 'package:project_zomboid_server/app/shared/models/alerts.dart';
+import 'package:uuid/uuid.dart';
 
 class Home extends StatelessWidget {
   const Home({Key? key}) : super(key: key);
@@ -15,30 +17,55 @@ class Home extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           FilledButton(
-              child: const Text('teste'),
+              child: const Text('Instalar Servidor'),
               onPressed: () async {
-                Process? process = await Process.start(
+                Map hardware = await Alert.getInputServerConfigs(context);
+
+                ramDedicated = hardware['ram'];
+                serverName = hardware['serverName'];
+
+                Process process = await Process.start(
                   "$applicationPath\\files\\steamcmd.exe +force_install_dir $applicationPath\\files\\server-data +login anonymous +app_update 380870 validate +quit",
                   [],
                   runInShell: true,
                 );
 
-                process.stdout.transform(utf8.decoder).forEach((x) {
+                process.stderr.transform(utf8.decoder).forEach((x) {
+                  Alert.showErrorAlert(context, x);
+                  process.kill();
+                });
+
+                process.stdout.transform(utf8.decoder).forEach((x) async {
                   if (x.contains("Success! App '380870' fully installed.")) {
-                    showDialog(
-                      context: context,
-                      builder: (_) => ContentDialog(
-                        content: const Text("Servidor Instalado com Sucesso"),
-                        actions: [Button(child: const Text('Ok'), onPressed: () => Navigator.pop(context))],
-                      ),
-                      barrierDismissible: true,
-                    );
+                    await setServerConfigs(context);
+                    Alert.showServerCreatedAlert(context);
+                    process.kill();
                   }
                 });
+              }),
+          FilledButton(
+              child: const Text('Iniciar Servidor'),
+              onPressed: () async {
+                Process process = await Process.start("$applicationPath\\files\\server-data\\StartServer64.bat", [], runInShell: true);
+
+                process.stdout.transform(utf8.decoder).forEach((x) async {
+                  if (x.contains("User 'admin' not found, creating it") || x.contains("Confirm the password:")) {
+                    dataBasePassword ??= const Uuid().v1();
+                    process.stdin.writeln(dataBasePassword);
+                  }
+
+                  if (x.contains("server is listening on port")) {
+                    Alert.showServerStarted(context);
+                  }
+                });
+              }),
+          FilledButton(
+              child: const Text('teste'),
+              onPressed: () async {
+                print(await Alert.getInputServerConfigs(context));
               }),
         ],
       ),
     );
   }
 }
-
